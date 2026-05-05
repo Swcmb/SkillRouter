@@ -24,7 +24,7 @@ Current agent systems usually expose only skill names and descriptions during se
 | Deployment target | Consumer hardware / local inference |
 
 ## Released Models
-🎉 4K+ Downloads Milestone Reached: 4K / 10K downloads  [███░░░░░░░]
+🎉 4K+ Downloads Milestone Reached: 4K / 10K downloads  [████░░░░░░]
 
 | Model | Role | Link |
 | --- | --- | --- |
