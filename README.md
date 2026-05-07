@@ -179,3 +179,9 @@ If you use this repository, benchmark, or released models in your work, please c
       url={https://arxiv.org/abs/2603.22455}, 
 }
 ```
+
+## License
+
+Code in this repository is licensed under the MIT License. See [LICENSE](LICENSE).
+
+Benchmark data, model weights, and third-party resources may be governed by their respective upstream licenses and terms.
