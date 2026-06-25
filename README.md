@@ -5,10 +5,6 @@
   Public release with benchmark data, evaluation scripts, and open 0.6B models.
 </p>
 
-<p align="center">
-  <img src="assets/readme/pipeline.png" alt="SkillRouter pipeline overview" width="960" />
-</p>
-
 SkillRouter is a practical retrieval system for large skill registries, where many skills look similar at the metadata level but differ in their actual implementation. This repository packages the public evaluation release: the benchmark, the released 0.6B models, and evaluation scripts for reproducing the retrieve-and-rerank pipeline on your own machine.
 
 ## Why SkillRouter
