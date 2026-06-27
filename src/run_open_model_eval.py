@@ -4,87 +4,25 @@ import argparse
 import json
 from pathlib import Path
 
-import numpy as np
 import torch
 
 from src.common import (
+    TIER_FILES,
+    aggregate,
+    append_to_strata,
+    encode_texts,
     ensure_dir,
+    filter_tasks_by_mode,
     format_query,
-    format_rerank_prompt,
     format_skill,
     get_device,
-    get_reranker_template_tokens,
     load_embedding_model,
     load_reranker_model,
-    tokenize_reranker_text,
-    encode_texts,
+    make_strata_buckets,
+    score_candidates_with_reranker,
 )
 from src.data_io import load_jsonl
 from src.metrics import compute_all_metrics
-
-
-TIER_FILES = {
-    "easy": "easy",
-    "hard": "hard",
-}
-
-
-def aggregate(metrics_list: list[dict]) -> dict:
-    out = {}
-    if not metrics_list:
-        return out
-    for key in metrics_list[0]:
-        out[key] = float(np.mean([m[key] for m in metrics_list]))
-    out["count"] = len(metrics_list)
-    return out
-
-
-def score_candidates_with_reranker(
-    model,
-    tokenizer,
-    query_text: str,
-    candidates: list[dict],
-    prompt_format: str,
-    max_length: int,
-    batch_size: int,
-    device: torch.device,
-) -> list[float]:
-    prefix_tokens, suffix_tokens = get_reranker_template_tokens(tokenizer)
-    token_true_id = tokenizer.convert_tokens_to_ids("yes")
-    token_false_id = tokenizer.convert_tokens_to_ids("no")
-
-    texts = [
-        format_rerank_prompt(
-            c["name"],
-            c.get("description", c.get("desc", "")),
-            c["body"],
-            query_text,
-            prompt_format=prompt_format,
-        )
-        for c in candidates
-    ]
-    tokenized = [
-        tokenize_reranker_text(text, tokenizer, prefix_tokens, suffix_tokens, max_length)
-        for text in texts
-    ]
-
-    scores: list[float] = []
-    pad_id = tokenizer.pad_token_id if tokenizer.pad_token_id is not None else 0
-    for i in range(0, len(tokenized), batch_size):
-        batch_ids = tokenized[i:i + batch_size]
-        max_len = max(len(x) for x in batch_ids)
-        padded, masks = [], []
-        for ids in batch_ids:
-            pad_len = max_len - len(ids)
-            padded.append([pad_id] * pad_len + ids)
-            masks.append([0] * pad_len + [1] * len(ids))
-        input_ids = torch.tensor(padded, dtype=torch.long, device=device)
-        attention_mask = torch.tensor(masks, dtype=torch.long, device=device)
-        with torch.no_grad():
-            logits = model(input_ids=input_ids, attention_mask=attention_mask).logits[:, -1, :]
-            batch_scores = (logits[:, token_true_id] - logits[:, token_false_id]).float().cpu().tolist()
-        scores.extend(batch_scores)
-    return scores
 
 
 def main():
@@ -131,20 +69,9 @@ def main():
     tasks = load_jsonl(data_root / "tasks.jsonl")
     relevance = json.loads((data_root / "relevance.json").read_text())
 
-    filtered_tasks = []
-    for task in tasks:
-        rel_entry = relevance.get(task["task_id"], {})
-        task_type = rel_entry.get("task_type")
-        if args.task_mode == "core" and task_type == "generic_only":
-            continue
-        if args.task_mode == "single":
-            gt_ids = set(rel_entry.get("gt_skill_ids", []))
-            if len(gt_ids) != 1:
-                continue
-        filtered_tasks.append(task)
+    filtered_tasks = filter_tasks_by_mode(tasks, relevance, args.task_mode)
 
     query_texts = [format_query(t["instruction_text"], max_len=2000) for t in filtered_tasks]
-    query_ids = [t["task_id"] for t in filtered_tasks]
     query_embs = encode_texts(
         emb_model, emb_tokenizer, query_texts, args.encoder_max_length, args.encoder_batch_size, device
     )
@@ -153,9 +80,9 @@ def main():
     for tier in args.tiers:
         tier_stem = TIER_FILES[tier]
         pool = load_jsonl(data_root / tier_stem)
-        pool_ids = [x["skill_id"] for x in pool]
+        pool_ids = [skill["skill_id"] for skill in pool]
         pool_id_set = set(pool_ids)
-        pool_texts = [format_skill(x, desc_max=500, body_max=8000) for x in pool]
+        pool_texts = [format_skill(skill, desc_max=500, body_max=8000) for skill in pool]
         pool_embs = encode_texts(
             emb_model, emb_tokenizer, pool_texts, args.encoder_max_length, args.encoder_batch_size, device
         )
@@ -163,8 +90,8 @@ def main():
 
         retrieval_results = {}
         reranked_results = {}
-        metrics_retrieval = {"all": [], "single": [], "multi": []}
-        metrics_pipeline = {"all": [], "single": [], "multi": []}
+        metrics_retrieval = make_strata_buckets()
+        metrics_pipeline = make_strata_buckets()
 
         for qi, task in enumerate(filtered_tasks):
             task_id = task["task_id"]
@@ -183,11 +110,7 @@ def main():
             top_ids = [pool_ids[idx] for idx in topk_idx.tolist()]
             retrieval_results[task_id] = top_ids
             m_ret = compute_all_metrics(top_ids, gt_ids, tier_relevance or None)
-            metrics_retrieval["all"].append(m_ret)
-            if len(gt_ids) == 1:
-                metrics_retrieval["single"].append(m_ret)
-            else:
-                metrics_retrieval["multi"].append(m_ret)
+            append_to_strata(metrics_retrieval, len(gt_ids), m_ret)
 
             candidates = [pool[idx] for idx in topk_idx.tolist()]
             scores = score_candidates_with_reranker(
@@ -200,15 +123,12 @@ def main():
                 args.reranker_batch_size,
                 device,
             )
-            ranked_pairs = sorted(zip(top_ids, scores), key=lambda x: x[1], reverse=True)
-            reranked_ids = [rid for rid, _ in ranked_pairs]
+            # 按重排分数降序排列
+            ranked_pairs = sorted(zip(top_ids, scores), key=lambda pair: pair[1], reverse=True)
+            reranked_ids = [sid for sid, _ in ranked_pairs]
             reranked_results[task_id] = reranked_ids
             m_pipe = compute_all_metrics(reranked_ids, gt_ids, tier_relevance or None)
-            metrics_pipeline["all"].append(m_pipe)
-            if len(gt_ids) == 1:
-                metrics_pipeline["single"].append(m_pipe)
-            else:
-                metrics_pipeline["multi"].append(m_pipe)
+            append_to_strata(metrics_pipeline, len(gt_ids), m_pipe)
 
         (retrieval_dir / f"{tier}.json").write_text(json.dumps(retrieval_results, indent=2, ensure_ascii=False))
         (reranked_dir / f"{tier}.json").write_text(json.dumps(reranked_results, indent=2, ensure_ascii=False))

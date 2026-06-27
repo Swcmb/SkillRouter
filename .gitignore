@@ -19,6 +19,8 @@ data/eval_core/hard/
 
 # Temporary files
 .tmp/
+.pytest_cache/
+.ruff_cache/
 
 # IDE
 .idea/
@@ -26,6 +28,10 @@ data/eval_core/hard/
 *.swp
 *.swo
 *~
+
+# Installation artifacts
+uninstall.sh
+claude-context/
 
 # OS
 .DS_Store

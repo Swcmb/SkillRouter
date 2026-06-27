@@ -1,0 +1,83 @@
+# PEP 621 项目元数据 + setuptools 构建后端
+[build-system]
+requires = ["setuptools>=68.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "skillrouter"
+version = "0.1.0"
+description = "Retrieval system for routing user tasks to the correct skill in large-scale LLM Agent skill registries"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "SkillRouter contributors" },
+]
+keywords = ["llm", "agent", "skill-routing", "retrieval", "reranking"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.51.0",
+    "numpy>=1.24.0",
+    "tqdm>=4.60.0",
+    "sentencepiece>=0.1.99",
+    "safetensors>=0.4.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/pipizhao/SkillRouter"
+Paper = "https://arxiv.org/abs/2603.22455"
+
+# 开发/测试依赖：pip install -e ".[dev]"
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "ruff>=0.4.0",
+]
+# HuggingFace 数据下载依赖：pip install -e ".[hf]"
+hf = [
+    "huggingface-hub>=0.20.0",
+]
+
+# ---- setuptools 包发现配置 ----
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+# ---- Ruff 代码检查配置 ----
+[tool.ruff]
+# 最低 Python 版本
+target-version = "py310"
+# 行宽限制：120 字符，匹配现有代码风格
+line-length = 120
+
+[tool.ruff.lint]
+# E: pycodestyle 错误
+# F: pyflakes 未使用导入/变量
+# W: pycodestyle 警告
+# I: isort 导入排序
+# UP: pyupgrade 现代化 Python 语法
+select = ["E", "F", "W", "I", "UP"]
+# 忽略部分规则，保持现有代码风格兼容
+ignore = [
+    "E501",   # 行过长 — 部分嵌套调用拆行成本高，暂不强制
+    "E741",   # 模糊变量名（如 l, O）— 本项目未使用
+]
+
+[tool.ruff.lint.isort]
+# 已知第三方库分组，确保导入排序一致
+known-third-party = ["torch", "transformers", "numpy", "tqdm", "sentencepiece", "safetensors"]
+
+# ---- pytest 配置 ----
+[tool.pytest.ini_options]
+testpaths = ["tests"]

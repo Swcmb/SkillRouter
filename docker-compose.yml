@@ -1,0 +1,39 @@
+# SkillRouter Docker Compose 配置
+# 提供 CPU 和 GPU 两种运行模式
+
+services:
+  # CPU 模式：运行测试
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: python -m pytest tests/ -v --tb=short
+    volumes:
+      - ./tests:/app/tests:ro
+
+  # CPU 模式：代码检查
+  lint:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: ruff check src/ tests/
+
+  # GPU 模式：完整评估（需要 nvidia-container-toolkit）
+  eval:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        BASE_IMAGE: nvidia/cuda:12.4.0-runtime-ubuntu22.04
+    command: python -m src.run_open_model_eval --help
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    volumes:
+      - ./data:/app/data:ro
+      - ./outputs:/app/outputs
+      - ./model:/app/model:ro

@@ -1,0 +1,45 @@
+# Git
+.git
+.gitignore
+
+# Python 缓存
+__pycache__
+*.py[cod]
+*$py.class
+*.egg-info
+dist
+build
+.eggs
+
+# 测试和缓存
+.pytest_cache
+.ruff_cache
+.coverage
+htmlcov
+
+# IDE 和编辑器
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# 文档和论文（不进入镜像）
+*.md
+*.pdf
+LICENSE
+
+# 本地数据和模型（体积大，运行时挂载）
+data/
+outputs/
+model/
+paper.pdf
+
+# Claude 相关配置
+.claude/
+claude/
+SKILL.md
+
+# Docker 自身
+Dockerfile
+.dockerignore

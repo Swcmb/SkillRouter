@@ -6,14 +6,16 @@ from pathlib import Path
 
 import torch
 
-from src.common import ensure_dir, format_query, format_skill, get_device, load_embedding_model, encode_texts
+from src.common import (
+    TIER_FILES,
+    encode_texts,
+    ensure_dir,
+    format_query,
+    format_skill,
+    get_device,
+    load_embedding_model,
+)
 from src.data_io import load_jsonl
-
-
-TIER_FILES = {
-    "easy": "easy",
-    "hard": "hard",
-}
 
 
 def main():
@@ -45,8 +47,8 @@ def main():
     for tier in args.tiers:
         tier_stem = TIER_FILES[tier]
         tier_pool = load_jsonl(data_root / tier_stem)
-        pool_ids = [s.get("skill_id") or s.get("id") or "" for s in tier_pool]
-        pool_texts = [format_skill(s, desc_max=args.desc_max, body_max=args.body_max) for s in tier_pool]
+        pool_ids = [skill.get("skill_id") or skill.get("id") or "" for skill in tier_pool]
+        pool_texts = [format_skill(skill, desc_max=args.desc_max, body_max=args.body_max) for skill in tier_pool]
         pool_embs = encode_texts(model, tokenizer, pool_texts, args.max_length, args.batch_size, device)
         sim_matrix = query_embs @ pool_embs.T
         retrieval_results = {}
