@@ -37,3 +37,16 @@ claude-context/
 .DS_Store
 Thumbs.db
 .omx/
+
+# Model files (large, download separately)
+model/
+
+# Paper (large binary)
+paper.pdf
+
+# Claude Code local config
+.claude/
+claude/
+
+# Skill file (local only)
+SKILL.md
